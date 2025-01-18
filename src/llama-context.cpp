@@ -530,7 +530,9 @@ size_t llama_output_reserve(struct llama_context & lctx, size_t n_outputs) {
     lctx.embd_size   = embd_size;
 
     // set all ids as invalid (negative)
-    std::fill(lctx.output_ids.begin(), lctx.output_ids.end(), -1);
+    for (size_t x = 0; x < lctx.output_ids.size(); ++x) {
+        lctx.output_ids[x] = -1;
+    }
 
     ggml_backend_buffer_clear(lctx.buf_output.get(), 0);
 
@@ -570,7 +572,9 @@ void llama_output_reorder(struct llama_context & ctx) {
                 }
             }
         }
-        std::fill(ctx.output_ids.begin(), ctx.output_ids.end(), -1);
+        for (size_t x = 0; x < ctx.output_ids.size(); ++x) {
+            ctx.output_ids[x] = -1;
+        }
         for (int32_t i = 0; i < n_outputs; ++i) {
             ctx.output_ids[out_ids[i]] = i;
         }
