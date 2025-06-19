@@ -142,17 +142,17 @@ static void binary_op(const ggml_compute_params * params, ggml_tensor * dst) {
 }
 
 void ggml_compute_forward_add_non_quantized(const ggml_compute_params * params, ggml_tensor * dst) {
-    binary_op<op_add>(params, dst);
+    //binary_op<op_add>(params, dst);
 }
 
 void ggml_compute_forward_sub(const ggml_compute_params * params, ggml_tensor * dst) {
-    binary_op<op_sub>(params, dst);
+    //binary_op<op_sub>(params, dst);
 }
 
 void ggml_compute_forward_mul(const ggml_compute_params * params, ggml_tensor * dst) {
-    binary_op<op_mul>(params, dst);
+    //binary_op<op_mul>(params, dst);
 }
 
 void ggml_compute_forward_div(const ggml_compute_params * params, ggml_tensor * dst) {
-    binary_op<op_div>(params, dst);
+    //binary_op<op_div>(params, dst);
 }

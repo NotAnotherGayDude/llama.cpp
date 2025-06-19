@@ -1,9 +1,19 @@
 cmake_minimum_required(VERSION 3.14) # for add_link_options and implicit target directories.
 project("llama.cpp" C CXX)
 include(CheckIncludeFileCXX)
-
+set(CMAKE_CXX_STANDARD 23)
 #set(CMAKE_WARN_DEPRECATED YES)
 set(CMAKE_WARN_UNUSED_CLI YES)
+
+include(FetchContent)
+FetchContent_Declare(
+        Jsonifier
+        GIT_REPOSITORY https://github.com/realtimechris/Jsonifier
+        GIT_TAG        dev-new
+)
+
+# Also provides "common"
+FetchContent_MakeAvailable(Jsonifier)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -197,6 +207,7 @@ if (LLAMA_BUILD_COMMON AND LLAMA_BUILD_TESTS AND NOT CMAKE_JS_VERSION)
     include(CTest)
     add_subdirectory(tests)
 endif()
+target_link_libraries(llama PUBLIC Jsonifier::Jsonifier)
 
 if (LLAMA_BUILD_COMMON AND LLAMA_BUILD_EXAMPLES)
     add_subdirectory(examples)

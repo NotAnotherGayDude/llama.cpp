@@ -3324,7 +3324,7 @@ void ggml_compute_forward_rms_norm(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_rms_norm_f32(params, dst);
+                //ggml_compute_forward_rms_norm_f32(params, dst);
             } break;
         default:
             {
@@ -4180,7 +4180,7 @@ void ggml_compute_forward_set(
 void ggml_compute_forward_cpy(
         const ggml_compute_params * params,
         ggml_tensor * dst) {
-    ggml_compute_forward_dup(params, dst);
+    //ggml_compute_forward_dup(params, dst);
 }
 
 // ggml_compute_forward_cont
@@ -4188,7 +4188,7 @@ void ggml_compute_forward_cpy(
 void ggml_compute_forward_cont(
         const ggml_compute_params * params,
         ggml_tensor * dst) {
-    ggml_compute_forward_dup(params, dst);
+    //ggml_compute_forward_dup(params, dst);
 }
 
 // ggml_compute_forward_reshape
@@ -4430,20 +4430,20 @@ void ggml_compute_forward_get_rows(
         case GGML_TYPE_IQ3_S:
         case GGML_TYPE_IQ2_S:
             {
-                ggml_compute_forward_get_rows_q(params, dst);
+                //ggml_compute_forward_get_rows_q(params, dst);
             } break;
         case GGML_TYPE_F16:
             {
-                ggml_compute_forward_get_rows_f16(params, dst);
+                //ggml_compute_forward_get_rows_f16(params, dst);
             } break;
         case GGML_TYPE_BF16:
             {
-                ggml_compute_forward_get_rows_bf16(params, dst);
+                //ggml_compute_forward_get_rows_bf16(params, dst);
             } break;
         case GGML_TYPE_F32:
         case GGML_TYPE_I32:
             {
-                ggml_compute_forward_get_rows_f32(params, dst);
+                //ggml_compute_forward_get_rows_f32(params, dst);
             } break;
         default:
             {
