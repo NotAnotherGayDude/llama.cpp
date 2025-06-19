@@ -4,6 +4,7 @@
 #include "llama-cparams.h"
 #include "llama-graph.h"
 #include "llama-adapter.h"
+#include <../src/spinlock_time.hpp>
 
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
@@ -28,6 +29,7 @@ struct llama_context {
 
     ~llama_context();
 
+    test::stop_watch<> stop_watch_val{ 0 };
     void synchronize();
 
     const llama_model   & get_model()   const;

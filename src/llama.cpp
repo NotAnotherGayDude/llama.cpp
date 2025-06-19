@@ -1,24 +1,22 @@
-#include "llama-impl.h"
-
-#include "llama-chat.h"
-#include "llama-mmap.h"
-#include "llama-vocab.h"
-#include "llama-model-loader.h"
-#include "llama-model-saver.h"
-#include "llama-model.h"
-
-#include "ggml.h"
-#include "ggml-backend.h"
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <spinlock_time.hpp>
+#include "ggml-backend.h"
+#include "ggml.h"
+#include "llama-chat.h"
+#include "llama-impl.h"
+#include "llama-mmap.h"
+#include "llama-model-loader.h"
+#include "llama-model-saver.h"
+#include "llama-model.h"
+#include "llama-vocab.h"
 
 #if defined(_MSC_VER)
-#pragma warning(disable: 4244 4267) // possible loss of data
+#    pragma warning(disable : 4244 4267)  // possible loss of data
 #endif
 
 //
@@ -27,7 +25,7 @@
 
 struct llama_sampler_chain_params llama_sampler_chain_default_params() {
     struct llama_sampler_chain_params result = {
-        /*.no_perf                     =*/ true,
+        /*.no_perf                     =*/true,
     };
 
     return result;
@@ -46,8 +44,7 @@ bool llama_supports_mlock(void) {
 }
 
 bool llama_supports_gpu_offload(void) {
-    return ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU) != nullptr ||
-           llama_supports_rpc();
+    return ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU) != nullptr || llama_supports_rpc();
 }
 
 bool llama_supports_rpc(void) {
@@ -60,7 +57,7 @@ void llama_backend_init(void) {
     // needed to initialize f16 tables
     {
         struct ggml_init_params params = { 0, NULL, false };
-        struct ggml_context * ctx = ggml_init(params);
+        struct ggml_context *   ctx    = ggml_init(params);
         ggml_free(ctx);
     }
 }
@@ -70,7 +67,8 @@ void llama_numa_init(enum ggml_numa_strategy numa) {
         auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
         GGML_ASSERT(dev && "CPU backend is not loaded");
         auto * reg = ggml_backend_dev_backend_reg(dev);
-        auto * numa_init_fn = (decltype(ggml_numa_init) *) ggml_backend_reg_get_proc_address(reg, "ggml_backend_cpu_numa_init");
+        auto * numa_init_fn =
+            (decltype(ggml_numa_init) *) ggml_backend_reg_get_proc_address(reg, "ggml_backend_cpu_numa_init");
         numa_init_fn(numa);
     }
 }
@@ -84,7 +82,8 @@ int64_t llama_time_us(void) {
 }
 
 // Returns 0 on success, -1 on error, and -2 on cancellation via llama_progress_callback
-static int llama_model_load(const std::string & fname, std::vector<std::string> & splits, llama_model & model, llama_model_params & params) {
+static int llama_model_load(const std::string & fname, std::vector<std::string> & splits, llama_model & model,
+                            llama_model_params & params) {
     // loading time will be recalculated after the first eval, so
     // we take page faults deferred by mmap() into consideration
     model.t_load_us = 0;
@@ -93,7 +92,8 @@ static int llama_model_load(const std::string & fname, std::vector<std::string> 
     model.t_start_us = tm.t_start_us;
 
     try {
-        llama_model_loader ml(fname, splits, params.use_mmap, params.check_tensors, params.kv_overrides, params.tensor_buft_overrides);
+        llama_model_loader ml(fname, splits, params.use_mmap, params.check_tensors, params.kv_overrides,
+                              params.tensor_buft_overrides);
 
         ml.print_info();
 
@@ -101,17 +101,17 @@ static int llama_model_load(const std::string & fname, std::vector<std::string> 
 
         try {
             model.load_arch(ml);
-        } catch(const std::exception & e) {
+        } catch (const std::exception & e) {
             throw std::runtime_error("error loading model architecture: " + std::string(e.what()));
         }
         try {
             model.load_hparams(ml);
-        } catch(const std::exception & e) {
+        } catch (const std::exception & e) {
             throw std::runtime_error("error loading model hyperparameters: " + std::string(e.what()));
         }
         try {
             model.load_vocab(ml);
-        } catch(const std::exception & e) {
+        } catch (const std::exception & e) {
             throw std::runtime_error("error loading model vocabulary: " + std::string(e.what()));
         }
 
@@ -134,23 +134,25 @@ static int llama_model_load(const std::string & fname, std::vector<std::string> 
     return 0;
 }
 
-static struct llama_model * llama_model_load_from_file_impl(
-        const std::string & path_model,
-        std::vector<std::string> & splits,
-        struct llama_model_params params) {
+static struct llama_model * llama_model_load_from_file_impl(const std::string &        path_model,
+                                                            std::vector<std::string> & splits,
+                                                            struct llama_model_params  params) {
     ggml_time_init();
 
     if (!params.vocab_only && ggml_backend_reg_count() == 0) {
-        LLAMA_LOG_ERROR("%s: no backends are loaded. hint: use ggml_backend_load() or ggml_backend_load_all() to load a backend before calling this function\n", __func__);
+        LLAMA_LOG_ERROR(
+            "%s: no backends are loaded. hint: use ggml_backend_load() or ggml_backend_load_all() to load a backend "
+            "before calling this function\n",
+            __func__);
         return nullptr;
     }
 
     unsigned cur_percentage = 0;
     if (params.progress_callback == NULL) {
         params.progress_callback_user_data = &cur_percentage;
-        params.progress_callback = [](float progress, void * ctx) {
+        params.progress_callback           = [](float progress, void * ctx) {
             unsigned * cur_percentage_p = (unsigned *) ctx;
-            unsigned percentage = (unsigned) (100 * progress);
+            unsigned   percentage       = (unsigned) (100 * progress);
             while (percentage > *cur_percentage_p) {
                 *cur_percentage_p = percentage;
                 LLAMA_LOG_CONT(".");
@@ -201,8 +203,9 @@ static struct llama_model * llama_model_load_from_file_impl(
         if (params.main_gpu < 0) {
             model->devices.clear();
         } else {
-            if (params.main_gpu >= (int)model->devices.size()) {
-                LLAMA_LOG_ERROR("%s: invalid value for main_gpu: %d (available devices: %zu)\n", __func__, params.main_gpu, model->devices.size());
+            if (params.main_gpu >= (int) model->devices.size()) {
+                LLAMA_LOG_ERROR("%s: invalid value for main_gpu: %d (available devices: %zu)\n", __func__,
+                                params.main_gpu, model->devices.size());
                 llama_model_free(model);
                 return nullptr;
             }
@@ -213,9 +216,10 @@ static struct llama_model * llama_model_load_from_file_impl(
     }
 
     for (auto * dev : model->devices) {
-        size_t free, total; // NOLINT
+        size_t free, total;  // NOLINT
         ggml_backend_dev_memory(dev, &free, &total);
-        LLAMA_LOG_INFO("%s: using device %s (%s) - %zu MiB free\n", __func__, ggml_backend_dev_name(dev), ggml_backend_dev_description(dev), free/1024/1024);
+        LLAMA_LOG_INFO("%s: using device %s (%s) - %zu MiB free\n", __func__, ggml_backend_dev_name(dev),
+                       ggml_backend_dev_description(dev), free / 1024 / 1024);
     }
 
     const int status = llama_model_load(path_model, splits, *model, params);
@@ -235,23 +239,17 @@ static struct llama_model * llama_model_load_from_file_impl(
 }
 
 // deprecated
-struct llama_model * llama_load_model_from_file(
-        const char * path_model,
-        struct llama_model_params params) {
+struct llama_model * llama_load_model_from_file(const char * path_model, struct llama_model_params params) {
     return llama_model_load_from_file(path_model, params);
 }
 
-struct llama_model * llama_model_load_from_file(
-        const char * path_model,
-        struct llama_model_params params) {
+struct llama_model * llama_model_load_from_file(const char * path_model, struct llama_model_params params) {
     std::vector<std::string> splits = {};
     return llama_model_load_from_file_impl(path_model, splits, params);
 }
 
-struct llama_model * llama_model_load_from_splits(
-        const char ** paths,
-        size_t n_paths,
-        struct llama_model_params params) {
+struct llama_model * llama_model_load_from_splits(const char ** paths, size_t n_paths,
+                                                  struct llama_model_params params) {
     std::vector<std::string> splits;
     if (n_paths == 0) {
         LLAMA_LOG_ERROR("%s: list of splits is empty\n", __func__);
@@ -274,13 +272,8 @@ void llama_model_save_to_file(const struct llama_model * model, const char * pat
 // chat templates
 //
 
-int32_t llama_chat_apply_template(
-                              const char * tmpl,
-         const struct llama_chat_message * chat,
-                                  size_t   n_msg,
-                                    bool   add_ass,
-                                    char * buf,
-                                 int32_t   length) {
+int32_t llama_chat_apply_template(const char * tmpl, const struct llama_chat_message * chat, size_t n_msg, bool add_ass,
+                                  char * buf, int32_t length) {
     const std::string curr_tmpl(tmpl == nullptr ? "chatml" : tmpl);
 
     // format the chat to string
@@ -290,7 +283,7 @@ int32_t llama_chat_apply_template(
         chat_vec[i] = &chat[i];
     }
 
-    std::string formatted_chat;
+    std::string       formatted_chat;
     llm_chat_template detected_tmpl = llm_chat_detect_template(curr_tmpl);
     if (detected_tmpl == LLM_CHAT_TEMPLATE_UNKNOWN) {
         return -1;
@@ -319,7 +312,7 @@ int llama_split_path(char * split_path, size_t maxlen, const char * path_prefix,
 
 int llama_split_prefix(char * split_prefix, size_t maxlen, const char * split_path, int split_no, int split_count) {
     std::string str_split_path(split_path);
-    char postfix[32];
+    char        postfix[32];
     snprintf(postfix, 32, "-%05d-of-%05d.gguf", split_no + 1, split_count);
     std::string str_postfix(postfix);
 
@@ -335,11 +328,12 @@ int llama_split_prefix(char * split_prefix, size_t maxlen, const char * split_pa
 
 const char * llama_print_system_info(void) {
     static std::string s;
-    s.clear(); // Clear the string, since it's static, otherwise it will accumulate data from previous calls.
+    s.clear();  // Clear the string, since it's static, otherwise it will accumulate data from previous calls.
 
     for (size_t i = 0; i < ggml_backend_reg_count(); i++) {
         auto * reg = ggml_backend_reg_get(i);
-        auto * get_features_fn = (ggml_backend_get_features_t) ggml_backend_reg_get_proc_address(reg, "ggml_backend_get_features");
+        auto * get_features_fn =
+            (ggml_backend_get_features_t) ggml_backend_reg_get_proc_address(reg, "ggml_backend_get_features");
         if (get_features_fn) {
             ggml_backend_feature * features = get_features_fn(reg);
             s += ggml_backend_reg_name(reg);
@@ -355,4 +349,3 @@ const char * llama_print_system_info(void) {
 
     return s.c_str();
 }
-
