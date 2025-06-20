@@ -178,6 +178,40 @@ static void atomic_thread_fence(memory_order mo) {
 #include <stdatomic.h>
 #endif
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+// Helper function to calculate total number of elements
+static int64_t calculate_total_elements(const struct ggml_tensor* tensor) {
+    int64_t total = 1;
+    for (int i = 0; i < GGML_MAX_DIMS; i++) {
+        if (tensor->ne[i] > 0) {
+            total *= tensor->ne[i];
+        }
+    }
+    return total;
+}
+
+// Helper function to get element size based on type
+static size_t get_type_size(enum ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_F32: return 4;
+        case GGML_TYPE_F16: return 2;
+        case GGML_TYPE_Q4_0: return 2; // Approximate
+        case GGML_TYPE_Q4_1: return 2;
+        case GGML_TYPE_Q5_0: return 2;
+        case GGML_TYPE_Q5_1: return 2;
+        case GGML_TYPE_Q8_0: return 1;
+        case GGML_TYPE_Q8_1: return 1;
+        case GGML_TYPE_I8: return 1;
+        case GGML_TYPE_I16: return 2;
+        case GGML_TYPE_I32: return 4;
+        default: return 1;
+    }
+}
+
 typedef HANDLE pthread_t;
 
 typedef DWORD thread_ret_t;
@@ -7002,7 +7036,7 @@ static void ggml_compute_forward_norm(
 }
 
 // ggml_compute_forward_group_rms_norm
-
+bool have_we_run;
 static void ggml_compute_forward_rms_norm_f32(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
@@ -7016,11 +7050,41 @@ static void ggml_compute_forward_rms_norm_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    GGML_TENSOR_UNARY_OP_LOCALS
+    const int64_t ne00 = (src0)->ne[0];
+    (void) (ne00);
+    const int64_t ne01 = (src0)->ne[1];
+    (void) (ne01);
+    const int64_t ne02 = (src0)->ne[2];
+    (void) (ne02);
+    const int64_t ne03 = (src0)->ne[3];
+    (void) (ne03);
+    const size_t nb00 = (src0)->nb[0];
+    (void) (nb00);
+    const size_t nb01 = (src0)->nb[1];
+    (void) (nb01);
+    const size_t nb02 = (src0)->nb[2];
+    (void) (nb02);
+    const size_t nb03 = (src0)->nb[3];
+    (void) (nb03);
+    const int64_t ne0 = (dst)->ne[0];
+    (void) (ne0);
+    const int64_t ne1 = (dst)->ne[1];
+    (void) (ne1);
+    const int64_t ne2 = (dst)->ne[2];
+    (void) (ne2);
+    const int64_t ne3 = (dst)->ne[3];
+    (void) (ne3);
+    const size_t nb0 = (dst)->nb[0];
+    (void) (nb0);
+    const size_t nb1 = (dst)->nb[1];
+    (void) (nb1);
+    const size_t nb2 = (dst)->nb[2];
+    (void) (nb2);
+    const size_t nb3 = (dst)->nb[3];
+    (void) (nb3);
 
     float eps;
     memcpy(&eps, dst->op_params, sizeof(float));
-
     GGML_ASSERT(eps >= 0.0f);
 
     // TODO: optimize
@@ -7044,7 +7108,7 @@ static void ggml_compute_forward_rms_norm_f32(
                 // }
 
                 const float scale = 1.0f/sqrtf(mean + eps);
-
+                
                 ggml_vec_scale_f32(ne00, y, scale);
             }
         }
@@ -7434,7 +7498,6 @@ static void ggml_compute_forward_mul_mat_one_chunk(
 static void ggml_compute_forward_mul_mat(
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
-
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
 
@@ -7466,32 +7529,6 @@ static void ggml_compute_forward_mul_mat(
     //   compute by src0 rows
 
     // TODO: extract to "extra_op"
-#if GGML_USE_LLAMAFILE
-    // broadcast factors
-    const int64_t r2 = ne12 / ne02;
-    const int64_t r3 = ne13 / ne03;
-
-    const bool src1_cont = ggml_is_contiguous(src1);
-
-    if (src1_cont) {
-        for (int64_t i13 = 0; i13 < ne13; i13++)
-            for (int64_t i12 = 0; i12 < ne12; i12++)
-                if (!llamafile_sgemm(params,
-                                     ne01, ne11, ne00/ggml_blck_size(src0->type),
-                                     (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
-                                     nb01/ggml_type_size(src0->type),
-                                     (const char *)src1->data + i12*nb12 + i13*nb13,
-                                     nb11/ggml_type_size(src1->type),
-                                     (char *)dst->data + i12*nb2 + i13*nb3,
-                                     nb1/ggml_type_size(dst->type),
-                                     src0->type,
-                                     src1->type,
-                                     dst->type))
-                    goto UseGgmlGemm1;
-        return;
-    }
-UseGgmlGemm1:;
-#endif
 
     if (src1->type != vec_dot_type) {
         char * wdata = params->wdata;
@@ -7518,32 +7555,8 @@ UseGgmlGemm1:;
         // Every thread starts at ith, so the first unprocessed chunk is nth.  This save a bit of coordination right at the start.
         atomic_store_explicit(&params->threadpool->current_chunk, nth, memory_order_relaxed);
     }
-
+    
     ggml_barrier(params->threadpool);
-
-#if GGML_USE_LLAMAFILE
-    if (src1->type != vec_dot_type) {
-        const void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
-        const size_t row_size = ggml_row_size(vec_dot_type, ne10);
-
-        for (int64_t i13 = 0; i13 < ne13; i13++)
-            for (int64_t i12 = 0; i12 < ne12; i12++)
-                if (!llamafile_sgemm(params,
-                                     ne01, ne11, ne00/ggml_blck_size(src0->type),
-                                     (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
-                                     nb01/ggml_type_size(src0->type),
-                                     (const char *)wdata + (i12*ne11 + i13*ne12*ne11)*row_size,
-                                     row_size/ggml_type_size(vec_dot_type),
-                                     (char *)dst->data + i12*nb2 + i13*nb3,
-                                     nb1/ggml_type_size(dst->type),
-                                     src0->type,
-                                     vec_dot_type,
-                                     dst->type))
-                    goto UseGgmlGemm2;
-        return;
-    }
-UseGgmlGemm2:;
-#endif
 
     // This is the size of the first dimension of the result, so we can iterate that way. (see the ASSERT above, these are the same numbers)
     const int64_t nr0 = ne0;
@@ -7599,7 +7612,7 @@ UseGgmlGemm2:;
         if ((nr0 % 2 != 0) || (ne11 % 2 != 0) || ((ir0_end - ir0_start) % 2 != 0) || ((ir1_end - ir1_start) % 2 != 0)) {
             num_rows_per_vec_dot = 1;
         }
-
+        //printf("NUM ROWS PER VEC DOT: %d\n",num_rows_per_vec_dot);
         ggml_compute_forward_mul_mat_one_chunk(params, dst, src0->type, num_rows_per_vec_dot, ir0_start, ir0_end, ir1_start, ir1_end);
 
         if (nth >= nchunk0 * nchunk1) {
@@ -12717,6 +12730,323 @@ static void ggml_compute_forward_opt_step_adamw(
     }
 }
 /////////////////////////////////
+#ifdef _WIN32
+// Windows version using QueryPerformanceCounter
+void spinlock_nanoseconds_c(uint64_t nanoseconds) {
+    LARGE_INTEGER frequency, start, current;
+
+    // Get timer frequency (ticks per second)
+    QueryPerformanceFrequency(&frequency);
+
+    // Get starting time
+    QueryPerformanceCounter(&start);
+
+    // Calculate target ticks
+    uint64_t target_ticks = start.QuadPart + (frequency.QuadPart * nanoseconds) / 1000000000ULL;
+
+    // Spinlock until target reached
+    do {
+        QueryPerformanceCounter(&current);
+    } while (current.QuadPart < target_ticks);
+}
+
+#else
+// Linux/macOS version using clock_gettime
+void spinlock_nanoseconds_c(uint64_t nanoseconds) {
+    struct timespec start, current;
+
+    // Get starting time
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    // Convert to nanoseconds
+    uint64_t start_ns  = start.tv_sec * 1000000000ULL + start.tv_nsec;
+    uint64_t target_ns = start_ns + nanoseconds;
+
+    // Spinlock until target reached
+    do {
+        clock_gettime(CLOCK_MONOTONIC, &current);
+    } while ((current.tv_sec * 1000000000ULL + current.tv_nsec) < target_ns);
+}
+#endif
+
+/////////////////////////////////
+
+int file_exists(const char* filename) {
+    if (!filename) {
+        return 0;
+    }
+    
+    FILE* file = fopen(filename, "r");
+    if (file) {
+        fclose(file);
+        return 1; // File exists
+    }
+    return 0; // File doesn't exist
+}
+
+int save_string_to_file(const char* filename, const char* content) {
+    if (!filename || !content) {
+        return -1;
+    }
+    
+    // SKIP IF FILE ALREADY EXISTS 🚫
+    if (file_exists(filename)) {
+        return 1; // Return 1 to indicate file was skipped (not an error)
+    }
+    
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        return -1;
+    }
+    
+    size_t content_len = strlen(content);
+    size_t written = fwrite(content, 1, content_len, file);
+    
+    int result = (written == content_len) ? 0 : -1;
+    fclose(file);
+    
+    return result;
+}
+
+int64_t current_iteration;
+
+char* create_json_filename(const char* name, int value) {
+    if (!name) {
+        return NULL;
+    }
+    
+    // Calculate required size: name + '-' + digits + ".json" + null terminator
+    size_t name_len = strlen(name);
+    
+    // Calculate digits needed for the integer (handle negative numbers)
+    int temp = value;
+    int digit_count = 0;
+    if (temp == 0) {
+        digit_count = 1;
+    } else {
+        if (temp < 0) {
+            digit_count = 1; // For the minus sign
+            temp = -temp;
+        }
+        while (temp > 0) {
+            digit_count++;
+            temp /= 10;
+        }
+    }
+    
+    // Total size: name + '-' + digits + ".json" + '\0'
+    size_t total_size = name_len + 1 + digit_count + 5 + 1;
+    
+    char* filename = malloc(total_size);
+    if (!filename) {
+        return NULL;
+    }
+    
+    // Build the filename: "name-value.json"
+    snprintf(filename, total_size, "%s-%d.json", name, value);
+    
+    return filename;
+}
+
+// Enhanced tensor filename generator with Q/K/V support! 🚀
+char* create_tensor_json_filename(const struct ggml_tensor* tensor, int iteration) {
+    if (!tensor || !tensor->name[0]) {
+        return NULL;
+    }
+    
+    const char* tensor_name = tensor->name;
+    
+    // WEIGHT TENSOR FILTER 🚫 - Skip any tensor with "weight" in its name
+    if (strstr(tensor_name, "weight") != NULL) {
+        return NULL; // Skip weight tensors entirely
+    }
+    
+    // NORM TENSOR DISAMBIGUATION 💀
+    int is_norm_tensor = (tensor->op == GGML_OP_RMS_NORM) && 
+                        (strncmp(tensor_name, "norm-", 5) == 0);
+    
+    // Q/K/V TENSOR DISAMBIGUATION ⚡
+    int is_qkv_tensor = (strncmp(tensor_name, "Qcur", 4) == 0) ||
+                       (strncmp(tensor_name, "Kcur", 4) == 0) ||
+                       (strncmp(tensor_name, "Vcur", 4) == 0);
+    
+    if (is_norm_tensor) {
+        // Handle norm disambiguation
+        if (tensor->src[0] && tensor->src[0]->name[0] != '\0') {
+            if (strstr(tensor->src[0]->name, "ffn_inp") != NULL) {
+                // FFN norm: "norm-X" → "norm-02-X-iteration.json"
+                const char* block_num = tensor_name + 5; // Skip "norm-"
+                
+                size_t total_size = 8 + strlen(block_num) + 1 + 12 + 6; // Conservative
+                char* filename = malloc(total_size);
+                if (!filename) {
+                    return NULL;
+                }
+                
+                snprintf(filename, total_size, "norm-02-%s-%d.json", block_num, iteration);
+                return filename;
+            }
+        }
+    }
+    else if (is_qkv_tensor) {
+        // Handle Q/K/V disambiguation 👑
+        int needs_02_suffix = 0;
+        
+        if (tensor->src[0] && tensor->src[0]->name[0] != '\0') {
+            // Check if source does NOT start with "blk."
+            if (strncmp(tensor->src[0]->name, "blk.", 4) != 0) {
+                needs_02_suffix = 1;
+            }
+        } else {
+            needs_02_suffix = 1;
+        }
+        
+        if (needs_02_suffix) {
+            // "Qcur-5" → "Qcur-5-02-iteration.json"
+            size_t total_size = strlen(tensor_name) + 4 + 1 + 12 + 6; // Conservative
+            char* filename = malloc(total_size);
+            if (!filename) {
+                return NULL;
+            }
+            
+            snprintf(filename, total_size, "%s-02-%d.json", tensor_name, iteration);
+            return filename;
+        }
+    }
+    
+    // Regular tensor: use standard naming
+    return create_json_filename(tensor_name, iteration);
+}
+
+char* ggml_tensor_to_json(const struct ggml_tensor* tensor, int iteration) {
+    if (!tensor) {
+        return NULL;
+    }
+    
+    // WEIGHT TENSOR FILTER 🚫 - Skip any tensor with "weight" in its name
+    if (strstr(tensor->name, "weight") != NULL) {
+        return NULL; // Skip weight tensors entirely
+    }
+    
+    // CHECK IF FILE ALREADY EXISTS - SKIP EXPENSIVE JSON GENERATION 🚫
+    char* potential_filename = create_tensor_json_filename(tensor, iteration);
+    if (potential_filename) {
+        if (file_exists(potential_filename)) {
+            free(potential_filename); // Clean up filename
+            return NULL; // File exists, skip JSON generation entirely
+        }
+        free(potential_filename); // Clean up filename (we'll regenerate it later if needed)
+    }
+    
+    size_t byte_size = ggml_nbytes(tensor);
+    
+    // FIX: Calculate proper buffer size
+    // Each byte becomes at most "255, " (5 chars), plus JSON overhead
+    size_t data_string_size = byte_size * 5; // Conservative estimate for "255, "
+    size_t json_overhead = 16384; // For all the JSON structure, name, dims, etc.
+    size_t estimated_size = data_string_size + json_overhead;
+    
+    char* json_str = malloc(estimated_size);
+    if (!json_str) {
+        return NULL;
+    }
+    
+    char* pos = json_str;
+    char* buffer_end = json_str + estimated_size - 1; // Leave room for null terminator
+    
+    // Start JSON object
+    pos += sprintf(pos, "{\n");
+    
+    // Count input tensors first
+    int input_count = 0;
+    for (struct ggml_tensor** tensor_ptr = tensor->src; *tensor_ptr; ++tensor_ptr) {
+        input_count++;
+    }
+    
+    // Serialize inputs array
+    pos += sprintf(pos, "  \"inputs\": [ ");
+    if (input_count > 0) {
+        bool first_input = true;
+        for (struct ggml_tensor** tensor_ptr = tensor->src; *tensor_ptr; ++tensor_ptr) {
+            if (!first_input) {
+                pos += sprintf(pos, ", ");
+            }
+            first_input = false;
+            
+            pos += sprintf(pos, "\"");
+            const char* input_name = (*tensor_ptr)->name;
+            for (int i = 0; i < GGML_MAX_NAME && input_name[i] != '\0'; ++i) {
+                char c = input_name[i];
+                if (c == '"' || c == '\\') {
+                    *pos++ = '\\';
+                }
+                *pos++ = c;
+            }
+            pos += sprintf(pos, "\"");
+        }
+    }
+    pos += sprintf(pos, " ],\n");
+    
+    // Serialize dimensions
+    pos += sprintf(pos, "  \"dims\": [ ");
+    for (int i = 0; i < GGML_MAX_DIMS; ++i) {
+        if (i > 0) {
+            pos += sprintf(pos, ", ");
+        }
+        pos += sprintf(pos, "%lld", (long long)tensor->ne[i]);
+    }
+    pos += sprintf(pos, " ],\n");
+    
+    // Serialize operation and type
+    pos += sprintf(pos, "  \"op\": %d,\n", (int)tensor->op);
+    pos += sprintf(pos, "  \"type\": %d,\n", (int)tensor->type);
+    
+    // Serialize tensor name
+    pos += sprintf(pos, "  \"name\": \"");
+    const char* tensor_name = tensor->name;
+    for (int i = 0; i < GGML_MAX_NAME && tensor_name[i] != '\0'; ++i) {
+        char c = tensor_name[i];
+        if (c == '"' || c == '\\') {
+            *pos++ = '\\';
+        }
+        *pos++ = c;
+    }
+    pos += sprintf(pos, "\",\n");
+    
+    // Serialize sampled data as flat array
+    pos += sprintf(pos, "  \"data\": [ ");
+    
+    // FIX: Proper condition and buffer bounds checking
+    if (tensor->data && byte_size > 0) {
+        uint8_t* data_bytes = (uint8_t*)tensor->data;
+        bool first_byte = true;
+        
+        for (size_t byte_idx = 0; byte_idx < byte_size; ++byte_idx) {
+            // Check if we have enough space left in buffer
+            if (pos + 10 >= buffer_end) { // Safety margin for "255, " + some extra
+                // Buffer too small, this shouldn't happen with our calculation but safety first
+                break;
+            }
+            
+            if (!first_byte) {
+                pos += sprintf(pos, ", ");
+            }
+            first_byte = false; // FIX: was setting to 0, should be false
+            
+            pos += sprintf(pos, "%d", (uint8_t)data_bytes[byte_idx]);
+        }
+    }
+    
+    pos += sprintf(pos, " ]\n");
+    
+    // End JSON object
+    pos += sprintf(pos, "}");
+    
+    // Null terminate
+    *pos = '\0';
+    
+    return json_str;
+}
 
 static void ggml_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor) {
     GGML_ASSERT(params);
@@ -12724,369 +13054,490 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
     if (tensor->op == GGML_OP_NONE || ggml_is_empty(tensor)) {
         return;
     }
-
+    //spinlock_nanoseconds_c(500);
     // extra_buffer op?
-    if (ggml_cpu_extra_compute_forward(params, tensor)) return;
-
+    for (struct ggml_tensor** tensor_new = tensor->src; *tensor_new; ++tensor_new) {
+        save_string_to_file(create_tensor_json_filename(*tensor_new, current_iteration),ggml_tensor_to_json(*tensor_new, current_iteration));
+    }
+    if (ggml_cpu_extra_compute_forward(params, tensor)) {
+        return;
+    }
     switch (tensor->op) {
         case GGML_OP_DUP:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_dup(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ADD:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_add(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ADD1:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_add1(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ACC:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_acc(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SUB:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sub(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MUL:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mul(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIV:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_div(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SQR:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sqr(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SQRT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sqrt(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_LOG:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_log(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SIN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sin(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_COS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cos(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SUM:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sum(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SUM_ROWS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sum_rows(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MEAN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mean(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ARGMAX:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_argmax(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_COUNT_EQUAL:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_count_equal(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_REPEAT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_repeat(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_REPEAT_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_repeat_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONCAT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_concat(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SILU_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_silu_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_NORM:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_norm(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RMS_NORM:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rms_norm(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RMS_NORM_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rms_norm_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GROUP_NORM:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_group_norm(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MUL_MAT:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mul_mat(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MUL_MAT_ID:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mul_mat_id(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_OUT_PROD:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_out_prod(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SCALE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_scale(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SET:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_set(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CPY:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cpy(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONT:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cont(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RESHAPE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_reshape(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_VIEW:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_view(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_PERMUTE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_permute(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_TRANSPOSE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_transpose(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GET_ROWS:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_get_rows(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GET_ROWS_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_get_rows_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIAG:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_diag(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIAG_MASK_INF:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_diag_mask_inf(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIAG_MASK_ZERO:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_diag_mask_zero(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SOFT_MAX:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_soft_max(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SOFT_MAX_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_soft_max_ext_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ROPE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rope(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ROPE_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rope_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CLAMP:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_clamp(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONV_TRANSPOSE_1D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_conv_transpose_1d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_IM2COL:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_im2col(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_IM2COL_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_im2col_back_f32(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_conv_transpose_2d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_POOL_1D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pool_1d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_POOL_2D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pool_2d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_POOL_2D_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pool_2d_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_UPSCALE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_upscale(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_PAD:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pad(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_PAD_REFLECT_1D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pad_reflect_1d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ARANGE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_arange(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_TIMESTEP_EMBEDDING:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_timestep_embedding(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ARGSORT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_argsort(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_LEAKY_RELU:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_leaky_relu(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_FLASH_ATTN_EXT:
             {
-                ggml_compute_forward_flash_attn_ext(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor->src[3], tensor);
-            } break;
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
+                ggml_compute_forward_flash_attn_ext(params, tensor->src[0], tensor->src[1], tensor->src[2],
+                                                    tensor->src[3], tensor);
+            }
+            break;
         case GGML_OP_FLASH_ATTN_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 int32_t t = ggml_get_op_params_i32(tensor, 0);
                 GGML_ASSERT(t == 0 || t == 1);
                 bool masked = t != 0;
                 ggml_compute_forward_flash_attn_back(params, masked, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SSM_CONV:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_ssm_conv(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SSM_SCAN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_ssm_scan(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_WIN_PART:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_win_part(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_WIN_UNPART:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_win_unpart(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_UNARY:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_unary(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GET_REL_POS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_get_rel_pos(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ADD_REL_POS:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_add_rel_pos(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RWKV_WKV6:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rwkv_wkv6(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GATED_LINEAR_ATTN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_gla(params, tensor);
-            } break;
-        case GGML_OP_MAP_UNARY:
-            {
-                ggml_unary_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_unary(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_BINARY:
-            {
-                ggml_binary_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_binary(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_CUSTOM1_F32:
-            {
-                ggml_custom1_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom1_f32(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_CUSTOM2_F32:
-            {
-                ggml_custom2_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom2_f32(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_CUSTOM3_F32:
-            {
-                ggml_custom3_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom3_f32(params, tensor, fun);
             }
             break;
         case GGML_OP_MAP_CUSTOM1:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_map_custom1(params, tensor);
             }
             break;
         case GGML_OP_MAP_CUSTOM2:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_map_custom2(params, tensor);
             }
             break;
         case GGML_OP_MAP_CUSTOM3:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_map_custom3(params, tensor);
             }
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cross_entropy_loss(params, tensor);
             }
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cross_entropy_loss_back(params, tensor);
             }
             break;
         case GGML_OP_OPT_STEP_ADAMW:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_opt_step_adamw(params, tensor);
             }
             break;
         case GGML_OP_NONE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 // nop
-            } break;
+            }
+            break;
         case GGML_OP_COUNT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 GGML_ABORT("fatal error");
             }
     }
@@ -14147,6 +14598,7 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
     // don't leave affinity set on the main thread
     clear_numa_thread_affinity();
 
+    ++current_iteration;
     enum ggml_status ret = threadpool->ec;
 
     if (disposable_threadpool) {

@@ -45,7 +45,7 @@
 
 #define LLAMA_STATE_SEQ_MAGIC   LLAMA_FILE_MAGIC_GGSQ
 #define LLAMA_STATE_SEQ_VERSION 2
-
+inline int64_t current_iteration{};
 #ifdef __cplusplus
 extern "C" {
 #endif
