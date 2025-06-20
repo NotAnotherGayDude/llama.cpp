@@ -4471,7 +4471,7 @@ static void ggml_compute_forward_add(
         case GGML_TYPE_F32:
             {
                 if (src1->type == GGML_TYPE_F32) {
-                    ggml_compute_forward_add_f32(params, dst);
+                    //ggml_compute_forward_add_f32(params, dst);
                 }
                 else {
                     GGML_ABORT("fatal error");
@@ -4480,10 +4480,10 @@ static void ggml_compute_forward_add(
         case GGML_TYPE_F16:
             {
                 if (src1->type == GGML_TYPE_F16) {
-                    ggml_compute_forward_add_f16_f16(params, dst);
+                    //ggml_compute_forward_add_f16_f16(params, dst);
                 }
                 else if (src1->type == GGML_TYPE_F32) {
-                    ggml_compute_forward_add_f16_f32(params, dst);
+                    //ggml_compute_forward_add_f16_f32(params, dst);
                 }
                 else {
                     GGML_ABORT("fatal error");
@@ -4492,10 +4492,10 @@ static void ggml_compute_forward_add(
         case GGML_TYPE_BF16:
             {
                 if (src1->type == GGML_TYPE_BF16) {
-                    ggml_compute_forward_add_bf16_bf16(params, dst);
+                    //ggml_compute_forward_add_bf16_bf16(params, dst);
                 }
                 else if (src1->type == GGML_TYPE_F32) {
-                    ggml_compute_forward_add_bf16_f32(params, dst);
+                    //ggml_compute_forward_add_bf16_f32(params, dst);
                 }
                 else {
                     GGML_ABORT("fatal error");
@@ -4523,7 +4523,7 @@ static void ggml_compute_forward_add(
         case GGML_TYPE_IQ3_S:
         case GGML_TYPE_IQ2_S:
             {
-                ggml_compute_forward_add_q_f32(params, dst);
+                //ggml_compute_forward_add_q_f32(params, dst);
             } break;
         default:
             {
@@ -5213,7 +5213,7 @@ static void ggml_compute_forward_mul(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_mul_f32(params, dst);
+                //ggml_compute_forward_mul_f32(params, dst);
             } break;
         default:
             {
@@ -7060,7 +7060,7 @@ static void ggml_compute_forward_rms_norm(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_rms_norm_f32(params, dst);
+                //ggml_compute_forward_rms_norm_f32(params, dst);
             } break;
         default:
             {
@@ -7434,7 +7434,7 @@ static void ggml_compute_forward_mul_mat_one_chunk(
 static void ggml_compute_forward_mul_mat(
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
-
+    /*
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
 
@@ -7518,9 +7518,9 @@ UseGgmlGemm1:;
         // Every thread starts at ith, so the first unprocessed chunk is nth.  This save a bit of coordination right at the start.
         atomic_store_explicit(&params->threadpool->current_chunk, nth, memory_order_relaxed);
     }
-
+    */
     ggml_barrier(params->threadpool);
-
+    /*
 #if GGML_USE_LLAMAFILE
     if (src1->type != vec_dot_type) {
         const void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
@@ -7607,7 +7607,7 @@ UseGgmlGemm2:;
         }
 
         current_chunk = atomic_fetch_add_explicit(&params->threadpool->current_chunk, 1, memory_order_relaxed);
-    }
+    }*/
 }
 
 // ggml_compute_forward_mul_mat_id
@@ -8303,7 +8303,7 @@ static void ggml_compute_forward_set(
 static void ggml_compute_forward_cpy(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
-    ggml_compute_forward_dup(params, dst);
+    //ggml_compute_forward_dup(params, dst);
 }
 
 // ggml_compute_forward_cont
@@ -8311,7 +8311,7 @@ static void ggml_compute_forward_cpy(
 static void ggml_compute_forward_cont(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
-    ggml_compute_forward_dup(params, dst);
+    //ggml_compute_forward_dup(params, dst);
 }
 
 // ggml_compute_forward_reshape
@@ -8553,20 +8553,20 @@ static void ggml_compute_forward_get_rows(
         case GGML_TYPE_IQ3_S:
         case GGML_TYPE_IQ2_S:
             {
-                ggml_compute_forward_get_rows_q(params, dst);
+                //ggml_compute_forward_get_rows_q(params, dst);
             } break;
         case GGML_TYPE_F16:
             {
-                ggml_compute_forward_get_rows_f16(params, dst);
+                //ggml_compute_forward_get_rows_f16(params, dst);
             } break;
         case GGML_TYPE_BF16:
             {
-                ggml_compute_forward_get_rows_bf16(params, dst);
+                //ggml_compute_forward_get_rows_bf16(params, dst);
             } break;
         case GGML_TYPE_F32:
         case GGML_TYPE_I32:
             {
-                ggml_compute_forward_get_rows_f32(params, dst);
+                //ggml_compute_forward_get_rows_f32(params, dst);
             } break;
         default:
             {
@@ -8958,7 +8958,7 @@ static void ggml_compute_forward_soft_max(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_soft_max_f32(params, dst);
+                //ggml_compute_forward_soft_max_f32(params, dst);
             } break;
         default:
             {
@@ -9641,11 +9641,11 @@ static void ggml_compute_forward_rope(
     switch (src0->type) {
         case GGML_TYPE_F16:
             {
-                ggml_compute_forward_rope_f16(params, dst, true);
+                //ggml_compute_forward_rope_f16(params, dst, true);
             } break;
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_rope_f32(params, dst, true);
+                //ggml_compute_forward_rope_f32(params, dst, true);
             } break;
         default:
             {
@@ -11681,59 +11681,59 @@ static void ggml_compute_forward_unary(
     switch (op) {
         case GGML_UNARY_OP_ABS:
             {
-                ggml_compute_forward_abs(params, dst);
+                //ggml_compute_forward_abs(params, dst);
             } break;
         case GGML_UNARY_OP_SGN:
             {
-                ggml_compute_forward_sgn(params, dst);
+                //ggml_compute_forward_sgn(params, dst);
             } break;
         case GGML_UNARY_OP_NEG:
             {
-                ggml_compute_forward_neg(params, dst);
+                //ggml_compute_forward_neg(params, dst);
             } break;
         case GGML_UNARY_OP_STEP:
             {
-                ggml_compute_forward_step(params, dst);
+                //ggml_compute_forward_step(params, dst);
             } break;
         case GGML_UNARY_OP_TANH:
             {
-                ggml_compute_forward_tanh(params, dst);
+                //ggml_compute_forward_tanh(params, dst);
             } break;
         case GGML_UNARY_OP_ELU:
             {
-                ggml_compute_forward_elu(params, dst);
+                //ggml_compute_forward_elu(params, dst);
             } break;
         case GGML_UNARY_OP_RELU:
             {
-                ggml_compute_forward_relu(params, dst);
+                //ml_compute_forward_relu(params, dst);
             } break;
         case GGML_UNARY_OP_SIGMOID:
             {
-                ggml_compute_forward_sigmoid(params, dst);
+                //ggml_compute_forward_sigmoid(params, dst);
             } break;
         case GGML_UNARY_OP_GELU:
             {
-                ggml_compute_forward_gelu(params, dst);
+                //ggml_compute_forward_gelu(params, dst);
             } break;
         case GGML_UNARY_OP_GELU_QUICK:
             {
-                ggml_compute_forward_gelu_quick(params, dst);
+                //ggml_compute_forward_gelu_quick(params, dst);
             } break;
         case GGML_UNARY_OP_SILU:
             {
-                ggml_compute_forward_silu(params, dst);
+                //ggml_compute_forward_silu(params, dst);
             } break;
         case GGML_UNARY_OP_HARDSWISH:
             {
-                ggml_compute_forward_hardswish(params, dst);
+                //ggml_compute_forward_hardswish(params, dst);
             } break;
         case GGML_UNARY_OP_HARDSIGMOID:
             {
-                ggml_compute_forward_hardsigmoid(params, dst);
+                //ggml_compute_forward_hardsigmoid(params, dst);
             } break;
         case GGML_UNARY_OP_EXP:
             {
-                ggml_compute_forward_exp(params, dst);
+                //ggml_compute_forward_exp(params, dst);
             } break;
         default:
             {
@@ -11861,7 +11861,7 @@ static void ggml_compute_forward_add_rel_pos(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_add_rel_pos_f32(params, dst);
+                //ggml_compute_forward_add_rel_pos_f32(params, dst);
             } break;
         default:
             {
@@ -12717,6 +12717,46 @@ static void ggml_compute_forward_opt_step_adamw(
     }
 }
 /////////////////////////////////
+#ifdef _WIN32
+// Windows version using QueryPerformanceCounter
+void spinlock_nanoseconds_c(uint64_t nanoseconds) {
+    LARGE_INTEGER frequency, start, current;
+
+    // Get timer frequency (ticks per second)
+    QueryPerformanceFrequency(&frequency);
+
+    // Get starting time
+    QueryPerformanceCounter(&start);
+
+    // Calculate target ticks
+    uint64_t target_ticks = start.QuadPart + (frequency.QuadPart * nanoseconds) / 1000000000ULL;
+
+    // Spinlock until target reached
+    do {
+        QueryPerformanceCounter(&current);
+    } while (current.QuadPart < target_ticks);
+}
+
+#else
+// Linux/macOS version using clock_gettime
+void spinlock_nanoseconds_c(uint64_t nanoseconds) {
+    struct timespec start, current;
+
+    // Get starting time
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    // Convert to nanoseconds
+    uint64_t start_ns  = start.tv_sec * 1000000000ULL + start.tv_nsec;
+    uint64_t target_ns = start_ns + nanoseconds;
+
+    // Spinlock until target reached
+    do {
+        clock_gettime(CLOCK_MONOTONIC, &current);
+    } while ((current.tv_sec * 1000000000ULL + current.tv_nsec) < target_ns);
+}
+#endif
+
+/////////////////////////////////
 
 static void ggml_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor) {
     GGML_ASSERT(params);
@@ -12724,369 +12764,487 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
     if (tensor->op == GGML_OP_NONE || ggml_is_empty(tensor)) {
         return;
     }
-
+    spinlock_nanoseconds_c(500);
     // extra_buffer op?
-    if (ggml_cpu_extra_compute_forward(params, tensor)) return;
-
+    if (ggml_cpu_extra_compute_forward(params, tensor)) {
+        return;
+    }
     switch (tensor->op) {
         case GGML_OP_DUP:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_dup(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ADD:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_add(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ADD1:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_add1(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ACC:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_acc(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SUB:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sub(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MUL:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mul(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIV:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_div(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SQR:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sqr(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SQRT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sqrt(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_LOG:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_log(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SIN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sin(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_COS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cos(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SUM:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sum(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SUM_ROWS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_sum_rows(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MEAN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mean(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ARGMAX:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_argmax(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_COUNT_EQUAL:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_count_equal(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_REPEAT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_repeat(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_REPEAT_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_repeat_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONCAT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_concat(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SILU_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_silu_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_NORM:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_norm(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RMS_NORM:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rms_norm(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RMS_NORM_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rms_norm_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GROUP_NORM:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_group_norm(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MUL_MAT:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mul_mat(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_MUL_MAT_ID:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_mul_mat_id(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_OUT_PROD:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_out_prod(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SCALE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_scale(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SET:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_set(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CPY:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cpy(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONT:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cont(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RESHAPE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_reshape(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_VIEW:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_view(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_PERMUTE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_permute(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_TRANSPOSE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_transpose(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GET_ROWS:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_get_rows(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GET_ROWS_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_get_rows_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIAG:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_diag(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIAG_MASK_INF:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_diag_mask_inf(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_DIAG_MASK_ZERO:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_diag_mask_zero(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SOFT_MAX:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_soft_max(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SOFT_MAX_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_soft_max_ext_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ROPE:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rope(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ROPE_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rope_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CLAMP:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_clamp(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONV_TRANSPOSE_1D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_conv_transpose_1d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_IM2COL:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_im2col(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_IM2COL_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_im2col_back_f32(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_conv_transpose_2d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_POOL_1D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pool_1d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_POOL_2D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pool_2d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_POOL_2D_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pool_2d_back(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_UPSCALE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_upscale(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_PAD:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pad(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_PAD_REFLECT_1D:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_pad_reflect_1d(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ARANGE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_arange(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_TIMESTEP_EMBEDDING:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_timestep_embedding(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ARGSORT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_argsort(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_LEAKY_RELU:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_leaky_relu(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_FLASH_ATTN_EXT:
             {
-                ggml_compute_forward_flash_attn_ext(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor->src[3], tensor);
-            } break;
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
+                ggml_compute_forward_flash_attn_ext(params, tensor->src[0], tensor->src[1], tensor->src[2],
+                                                    tensor->src[3], tensor);
+            }
+            break;
         case GGML_OP_FLASH_ATTN_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 int32_t t = ggml_get_op_params_i32(tensor, 0);
                 GGML_ASSERT(t == 0 || t == 1);
                 bool masked = t != 0;
                 ggml_compute_forward_flash_attn_back(params, masked, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SSM_CONV:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_ssm_conv(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_SSM_SCAN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_ssm_scan(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_WIN_PART:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_win_part(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_WIN_UNPART:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_win_unpart(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_UNARY:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_unary(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GET_REL_POS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_get_rel_pos(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_ADD_REL_POS:
             {
+                //printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_add_rel_pos(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_RWKV_WKV6:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_rwkv_wkv6(params, tensor);
-            } break;
+            }
+            break;
         case GGML_OP_GATED_LINEAR_ATTN:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_gla(params, tensor);
-            } break;
-        case GGML_OP_MAP_UNARY:
-            {
-                ggml_unary_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_unary(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_BINARY:
-            {
-                ggml_binary_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_binary(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_CUSTOM1_F32:
-            {
-                ggml_custom1_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom1_f32(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_CUSTOM2_F32:
-            {
-                ggml_custom2_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom2_f32(params, tensor, fun);
-            }
-            break;
-        case GGML_OP_MAP_CUSTOM3_F32:
-            {
-                ggml_custom3_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom3_f32(params, tensor, fun);
             }
             break;
         case GGML_OP_MAP_CUSTOM1:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_map_custom1(params, tensor);
             }
             break;
         case GGML_OP_MAP_CUSTOM2:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_map_custom2(params, tensor);
             }
             break;
         case GGML_OP_MAP_CUSTOM3:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_map_custom3(params, tensor);
             }
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cross_entropy_loss(params, tensor);
             }
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_cross_entropy_loss_back(params, tensor);
             }
             break;
         case GGML_OP_OPT_STEP_ADAMW:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 ggml_compute_forward_opt_step_adamw(params, tensor);
             }
             break;
         case GGML_OP_NONE:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 // nop
-            } break;
+            }
+            break;
         case GGML_OP_COUNT:
             {
+                printf("OP-NAME: %s\n", ggml_op_name(tensor->op));
                 GGML_ABORT("fatal error");
             }
     }

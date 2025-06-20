@@ -1,5 +1,7 @@
 #include "llama-impl.h"
+#include <filesystem>
 
+#include "../ggml/src/ggml-impl.h"
 #include "llama-chat.h"
 #include "llama-mmap.h"
 #include "llama-context.h"
@@ -25,6 +27,184 @@
 #include <cstring>
 #include <ctime>
 #include <functional>
+#include <mutex>
+#include <chrono>
+
+namespace test{ 
+
+// from
+// https://stackoverflow.com/questions/16337610/how-to-know-if-a-type-is-a-specialization-of-stdvector
+template <typename, template <typename...> typename> constexpr bool is_specialization_v = false;
+
+template <template <typename...> typename value_type, typename... arg_types>
+constexpr bool is_specialization_v<value_type<arg_types...>, value_type> = true;
+
+template <typename value_type> concept time_type = is_specialization_v<value_type, std::chrono::duration>;
+
+template <time_type value_type = std::chrono::nanoseconds> class stop_watch {
+  public:
+    using hr_clock = std::conditional_t<std::chrono::high_resolution_clock::is_steady,
+                                        std::chrono::high_resolution_clock, std::chrono::steady_clock>;
+    static constexpr bool lock_free{ std::atomic<value_type>::is_always_lock_free };
+    using time_type = std::conditional_t<lock_free, value_type, uint64_t>;
+
+    stop_watch(uint64_t newTime) noexcept { total_time_units.store(time_type{ newTime }, std::memory_order_release); }
+
+    stop_watch & operator=(stop_watch && other) noexcept {
+        if (this != &other) {
+            total_time_units.store(other.total_time_units.load(std::memory_order_acquire), std::memory_order_release);
+            start_time_units.store(other.start_time_units.load(std::memory_order_acquire), std::memory_order_release);
+        }
+        return *this;
+    }
+
+    stop_watch(stop_watch && other) noexcept { *this = std::move(other); }
+
+    stop_watch & operator=(const stop_watch & other) noexcept {
+        if (this != &other) {
+            total_time_units.store(other.total_time_units.load(std::memory_order_acquire), std::memory_order_release);
+            start_time_units.store(other.start_time_units.load(std::memory_order_acquire), std::memory_order_release);
+        }
+        return *this;
+    }
+
+    stop_watch(const stop_watch & other) noexcept { *this = other; }
+
+    bool has_time_elapsed() noexcept {
+        return ((get_current_time() - start_time_units.load(std::memory_order_acquire)) >=
+                total_time_units.load(std::memory_order_acquire));
+    }
+
+    void add_time() noexcept {
+        //std::unique_lock lock{ mutex };
+        values.emplace_back(total_time_elapsed());
+        //lock.release();
+        reset();
+    }
+
+    uint64_t get_count() noexcept { return values.size(); }
+
+    uint64_t get_average(time_type newTimeValue = time_type{}) noexcept {
+        std::unique_lock lock{ mutex };
+        uint64_t         total_time{};
+        for (auto & value : values) {
+            total_time += get_value_as_uint(value);
+        }
+        return total_time / ((values.size() > 0) ? values.size() : 1);
+    }
+
+    void reset(time_type newTimeValue = time_type{}) noexcept {
+        if (newTimeValue != time_type{}) {
+            total_time_units.store(newTimeValue, std::memory_order_release);
+        }
+        start_time_units.store(get_current_time(), std::memory_order_release);
+    }
+
+    uint64_t get_total_wait_time() const noexcept {
+        return get_value_as_uint(total_time_units.load(std::memory_order_acquire));
+    }
+
+    time_type total_time_elapsed() noexcept {
+        return get_current_time() - start_time_units.load(std::memory_order_acquire);
+    }
+
+    uint64_t total_time_elapsed_uint64() noexcept {
+        return get_value_as_uint(get_current_time()) -
+               get_value_as_uint(start_time_units.load(std::memory_order_acquire));
+    }
+
+  protected:
+    std::atomic<time_type> total_time_units{};
+    std::atomic<time_type> start_time_units{};
+    std::vector<time_type> values{};
+    std::mutex             mutex{};
+
+    time_type get_current_time() {
+        if constexpr (lock_free) {
+            return std::chrono::duration_cast<value_type>(hr_clock::now().time_since_epoch());
+        } else {
+            return std::chrono::duration_cast<value_type>(hr_clock::now().time_since_epoch()).count();
+        }
+    }
+
+    uint64_t get_value_as_uint(time_type time) {
+        if constexpr (lock_free) {
+            return time.count();
+        } else {
+            return time;
+        }
+    }
+};
+}  // namespace test
+
+#include <jsonifier/Index.hpp>
+#include <fstream>
+
+struct intermediary_tensor {
+    std::vector<uint64_t> dims{ [] {
+        std::vector<uint64_t> return_values{};
+        return_values.resize(4);
+        return return_values;
+    }() };
+    std::string          name{};
+    std::vector<uint8_t> data{};
+    ggml_type            type{};
+    ggml_op              op{};
+};
+
+namespace jsonifier {
+template <> struct core<intermediary_tensor> {
+    using value_type = intermediary_tensor;
+    static constexpr auto parseValue = createValue<&value_type::dims, &value_type::op, &value_type::type,
+                                                   &value_type::name, &value_type::data>();
+};
+}  // namespace jsonifier
+
+intermediary_tensor convert_ggml_tensor(ggml_tensor * tensor) {
+    intermediary_tensor return_value{};
+    for (size_t x = 0; x < 4; ++x) {
+        return_value.dims[x] = tensor->ne[x];
+    }
+    return_value.name = tensor->name;
+    return_value.op   = tensor->op;
+    return_value.type = tensor->type;
+    return_value.data.resize(128);
+    std::memcpy(return_value.data.data(), tensor->data, 128);
+    return return_value;
+}
+
+template <bool exceptions> class file_saver {
+  public:
+    file_saver(const std::filesystem::path & path, const void * data, uint64_t size) {
+        if (!data || size == 0) {
+            if constexpr (exceptions) {
+                throw std::runtime_error("Cannot save null or empty data to file: " + path.string());
+            } else {
+                std::cerr << "Cannot save null or empty data to file: " + path.string() << std::endl;
+            }
+        }
+
+        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            if constexpr (exceptions) {
+                throw std::runtime_error("Failed to open file for writing: " + path.string());
+            } else {
+                std::cerr << "Failed to open file for writing: " + path.string() << std::endl;
+            }
+        }
+
+        file.write(static_cast<const char *>(data), static_cast<std::streamsize>(size));
+        if (!file) {
+            if constexpr (exceptions) {
+                throw std::runtime_error("Failed to write data to file: " + path.string());
+            } else {
+                std::cerr << "Failed to write data to file: " + path.string() << std::endl;
+            }
+        }
+    }
+};
+
+inline test::stop_watch stop_watch_val{ 0 };
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -1202,7 +1382,7 @@ struct llm_build_context {
                 cb(tmp, "K_shifted_f32", il);
                 tmp = ggml_cpy(ctx0, tmp, k);
             } else {
-                // we rotate only the first n_rot dimensions
+                // we rotate only the first n_rot dims
                 tmp = ggml_rope_ext_inplace(ctx0, k,
                         lctx.inp_K_shift, rope_factors, n_rot, rope_type, n_ctx_orig, freq_base, freq_scale,
                         ext_factor, attn_factor, beta_fast, beta_slow);
@@ -7548,7 +7728,7 @@ struct llm_build_context {
     ggml_cgraph * build_rwkv6() {
         struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, model.max_nodes(), false);
 
-        // Token shift state dimensions should be 2 * n_emb
+        // Token shift state dims should be 2 * n_emb
         GGML_ASSERT(n_embd == hparams.n_embd_k_s() / 2);
 
         const int64_t n_seqs = ubatch.n_seqs;
@@ -8444,6 +8624,9 @@ static enum ggml_status llama_graph_compute(
 // return positive int on warning
 // return negative int on error
 //
+int64_t current_iteration{};
+bool have_we_serialized{ false };
+
 static int llama_decode_impl(
          llama_context & lctx,
            llama_batch   inp_batch) {
@@ -8623,8 +8806,50 @@ static int llama_decode_impl(
         ggml_backend_sched_alloc_graph(lctx.sched.get(), gf);
 
         llama_set_inputs(lctx, ubatch);
+        std::cout << "DEBUG: ubatch.token = " << (void *) ubatch.token << std::endl;
+        std::cout << "DEBUG: ubatch.embd = " << (void *) ubatch.embd << std::endl;
+        std::cout << "DEBUG: ubatch.n_tokens = " << ubatch.n_tokens << std::endl;
 
+        stop_watch_val.reset();
+        std::map<std::string, intermediary_tensor> leafs{};
+        std::map<std::string, intermediary_tensor> leafs_new{};
+        for (size_t x = 0; x < gf->n_leafs; ++x) {
+            leafs[gf->leafs[x]->name] = convert_ggml_tensor(gf->leafs[x]);
+        }
+        std::string               leaf_string{};
+        std::string               leaf_string_new{};
+        jsonifier::jsonifier_core parser{};
+        parser.serializeJson<jsonifier::serialize_options{ .prettify = false }>(leafs, leaf_string);
+        file_saver<false>{ std::string{ "C:/users/chris/source/repos/ft-tl/Leaf_Data_" } +
+                               std::to_string(current_iteration) + ".json",
+                           leaf_string.data(), leaf_string.size() };
+        std::map<std::string, intermediary_tensor> nodes{};
+        for (size_t x = 0; x < gf->n_nodes; ++x) {
+            nodes[gf->nodes[x]->name] = convert_ggml_tensor(gf->nodes[x]);
+        }
+        std::string node_string{};
+        parser.serializeJson<jsonifier::serialize_options{ .prettify = false }>(nodes, node_string);
+        file_saver<false>{ std::string{ "C:/users/chris/source/repos/ft-tl/Node_Data_" } +
+                               std::to_string(current_iteration) + ".json",
+                           node_string.data(), node_string.size() };
+        have_we_serialized = true;
+        ++current_iteration;
         const auto compute_status = llama_graph_compute(lctx, gf, n_threads, threadpool);
+        stop_watch_val.add_time();
+        std::cout << "DEBUG: ubatch.n_tokens = " << ubatch.n_tokens << std::endl;
+        if (ubatch.token) {
+            std::cout << "DEBUG: ubatch.token contents: ";
+            std::string output_string{};
+            for (int i = 0; i < std::min(8u, ubatch.n_tokens); ++i) {
+                output_string += std::to_string(ubatch.token[i]) + " ";
+            }
+            std::cout << output_string << std::endl;
+        }
+        
+        //std::cout << "FOR " << cparams.n_threads << " THREADS, WITH " << 0 << " NANOSECONDS OF SPINLOCK PER KERNEL, "
+        //<< "LLAMA.CPP/GGML AVERAGE COMPUTE TIME, OVER: "
+        //<< std::setw(50 - std::size("LLAMA.CPP/GGML AVERAGE COMPUTE TIME, OVER: "))
+        //<< stop_watch_val.get_count() << " TOKENS: " << stop_watch_val.get_average() << std::endl;
         if (compute_status != GGML_STATUS_SUCCESS) {
             kv_slot_restorer.restore(kv_self);
             switch (compute_status) {
@@ -9175,6 +9400,7 @@ static void llama_kv_cache_defrag_impl(struct llama_context & lctx) {
     ggml_cgraph * gf = llama_build_graph_defrag(lctx, ids);
 
     llama_graph_compute(lctx, gf, lctx.cparams.n_threads, lctx.threadpool);
+    std::cout << "WERE HERE THIS IS IT!" << std::endl;
 #endif
 
     //const int64_t t_end = ggml_time_us();
@@ -9201,6 +9427,7 @@ static void llama_kv_cache_update_impl(struct llama_context & lctx) {
             llama_set_k_shift(lctx);
 
             llama_graph_compute(lctx, gf, lctx.cparams.n_threads, lctx.threadpool);
+            std::cout << "WERE HERE THIS IS IT" << std::endl;
 
             need_reserve = true;
         }
