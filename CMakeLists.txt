@@ -4,6 +4,16 @@ include(CheckIncludeFileCXX)
 
 #set(CMAKE_WARN_DEPRECATED YES)
 set(CMAKE_WARN_UNUSED_CLI YES)
+set(CMAKE_CXX_STANDARD 23)
+include(FetchContent)
+FetchContent_Declare(
+        Jsonifier
+        GIT_REPOSITORY https://github.com/realtimechris/jsonifier.git
+        GIT_TAG        dev-new
+)
+
+# Also provides "common"
+FetchContent_MakeAvailable(Jsonifier)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -158,6 +168,7 @@ if (GGML_TARGET_DEFINES)
     list(APPEND GGML_TRANSIENT_DEFINES ${GGML_TARGET_DEFINES})
 endif()
 get_target_property(GGML_LINK_LIBRARIES ggml LINK_LIBRARIES)
+target_link_libraries(llama PUBLIC Jsonifier::Jsonifier)
 # all public headers
 set(LLAMA_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/llama.h

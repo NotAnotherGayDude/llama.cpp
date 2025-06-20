@@ -6,9 +6,7 @@
 #include <sstream>
 
 #if __cplusplus >= 202000L
-    #define LU8(x) (const char*)(u8##x)
 #else
-    #define LU8(x) u8##x
 #endif
 
 // trim whitespace from the beginning and end of a string
@@ -147,12 +145,12 @@ llm_chat_template llm_chat_detect_template(const std::string & tmpl) {
         return LLM_CHAT_TEMPLATE_CHATGML_3;
     } else if (tmpl_contains("[gMASK]<sop>")) {
         return LLM_CHAT_TEMPLATE_CHATGML_4;
-    } else if (tmpl_contains(LU8("<用户>"))) {
+    } else if (tmpl_contains(("<用户>"))) {
         // MiniCPM-3B-OpenHermes-2.5-v2-GGUF
         return LLM_CHAT_TEMPLATE_MINICPM;
     } else if (tmpl_contains("'Assistant: ' + message['content'] + eos_token")) {
         return LLM_CHAT_TEMPLATE_DEEPSEEK_2;
-    } else if (tmpl_contains(LU8("'<｜Assistant｜>' + message['content'] + '<｜end▁of▁sentence｜>'"))) {
+    } else if (tmpl_contains(("'<｜Assistant｜>' + message['content'] + '<｜end▁of▁sentence｜>'"))) {
         return LLM_CHAT_TEMPLATE_DEEPSEEK_3;
     } else if (tmpl_contains("[|system|]") && tmpl_contains("[|assistant|]") && tmpl_contains("[|endofturn|]")) {
         // ref: https://huggingface.co/LGAI-EXAONE/EXAONE-3.0-7.8B-Instruct/discussions/8#66bae61b1893d14ee8ed85bb
@@ -445,7 +443,7 @@ int32_t llm_chat_apply_template(
         for (auto message : chat) {
             std::string role(message->role);
             if (role == "user") {
-                ss << LU8("<用户>");
+                ss << ("<用户>");
                 ss << trim(message->content);
                 ss << "<AI>";
             } else {
@@ -461,7 +459,7 @@ int32_t llm_chat_apply_template(
             } else if (role == "user") {
                 ss << "User: " << message->content << "\n\n";
             } else if (role == "assistant") {
-                ss << "Assistant: " << message->content << LU8("<｜end▁of▁sentence｜>");
+                ss << "Assistant: " << message->content << ("<｜end▁of▁sentence｜>");
             }
         }
         if (add_ass) {
@@ -474,13 +472,13 @@ int32_t llm_chat_apply_template(
             if (role == "system") {
                 ss << message->content << "\n\n";
             } else if (role == "user") {
-                ss << LU8("<｜User｜>") << message->content;
+                ss << ("<｜User｜>") << message->content;
             } else if (role == "assistant") {
-                ss << LU8("<｜Assistant｜>") << message->content << LU8("<｜end▁of▁sentence｜>");
+                ss << ("<｜Assistant｜>") << message->content << ("<｜end▁of▁sentence｜>");
             }
         }
         if (add_ass) {
-            ss << LU8("<｜Assistant｜>");
+            ss << ("<｜Assistant｜>");
         }
     } else if (tmpl == LLM_CHAT_TEMPLATE_EXAONE_3) {
         // ref: https://huggingface.co/LGAI-EXAONE/EXAONE-3.0-7.8B-Instruct/discussions/8#66bae61b1893d14ee8ed85bb
